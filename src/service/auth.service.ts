@@ -1,0 +1,155 @@
+import { Request, Response } from "express";
+import { prisma } from "../lib/prisma";
+import bcrypt from "bcrypt";
+import jwt, { SignOptions } from "jsonwebtoken";
+import { Role, User, Tenant, RefreshToken } from "@prisma/client";
+import { create } from "node:domain";
+
+type SignupResult = { accessToken: string; refreshToken: string };
+const signupService = async (
+  name: string,
+  slug: string,
+  email: string,
+  password: string,
+): Promise<SignupResult> => {
+  const checkExistingSlug = await prisma.tenant.findUnique({
+    where: { slug },
+  });
+  if (checkExistingSlug) throw new Error("Slug already exists");
+
+  const hashedPassword = await bcrypt.hash(password, 10);
+
+  // Create tenant and user in a transaction to ensure atomicity
+  const { tenant, user } = await prisma.$transaction(async (tx) => {
+    const tenant = await tx.tenant.create({
+      data: { name, slug },
+    });
+    const user = await tx.user.create({
+      data: {
+        email,
+        password: hashedPassword,
+        role: "ADMIN",
+        tenantId: tenant.id,
+      },
+    });
+    return { tenant, user };
+  });
+
+  const accessToken = generateAccessToken(user.id, tenant.id, user.role);
+  const refreshToken = generateRefreshToken(user.id, tenant.id, user.role);
+
+  await createRefreshToken(refreshToken, user.id, tenant.id);
+  return { accessToken, refreshToken };
+};
+
+const loginService = async (email: string, password: string, slug: string) => {
+  const tenant = await prisma.tenant.findUnique({ where: { slug } });
+  if (!tenant) throw new Error("Invalid Credentials");
+
+  const user = await prisma.user.findUnique({
+    where: { email_tenantId: { email, tenantId: tenant.id } },
+  });
+
+  const isPasswordValid =
+    user && (await bcrypt.compare(password, user.password));
+  if (!user || !isPasswordValid) throw new Error("Invalid Credentials");
+
+  const accessToken = generateAccessToken(user.id, tenant.id, user.role);
+  const refreshToken = generateRefreshToken(user.id, tenant.id, user.role);
+
+  await createRefreshToken(refreshToken, user.id, tenant.id);
+  return { accessToken, refreshToken };
+};
+
+const refreshTokenService = async (refreshToken: string) => {
+  let payload;
+  try{
+    payload = jwt.verify(
+    refreshToken,
+    process.env.JWT_REFRESH_SECRET || "",
+  ) as { userId: string; tenantId: string, role: Role };
+  } catch (error) {
+    throw new Error("Invalid refresh token");
+  }
+
+  const refreshTokenRecord = await prisma.refreshToken.findUnique({
+    where: { token: refreshToken },
+  });
+  // If token not found or expired, throw error
+  if (!refreshTokenRecord) throw new Error("Refresh token not found");
+  if (refreshTokenRecord.expiresAt < new Date()) {
+    await prisma.refreshToken.delete({ where: { token: refreshToken } });
+    throw new Error("Refresh token expired");
+  }
+
+  // Delete old token and create and return new one
+  await prisma.refreshToken.delete({ where: { token: refreshToken } });
+  const newRefreshToken = generateRefreshToken(
+    payload.userId,
+    payload.tenantId,
+    payload.role
+  );
+
+  await createRefreshToken(
+    newRefreshToken,
+    payload.userId,
+    payload.tenantId,
+  );
+
+  const accessToken = generateAccessToken(
+    payload.userId,
+    payload.tenantId,
+    payload.role
+  );
+
+  return { newRefreshToken, accessToken };
+};
+
+const logoutService = async (refreshToken: string) => {
+  if (!refreshToken) throw new Error("Refresh token is required for logout");
+  await prisma.refreshToken.delete({ where: { token: refreshToken } });
+
+  return true;
+};
+
+const createRefreshToken = async (
+  token: string,
+  userId: string,
+  tenantId: string,
+) => {
+  const expiresAt = getRefreshTokenExpiry();
+  return await prisma.refreshToken.create({
+    data: { token, userId, tenantId, expiresAt },
+  });
+};
+
+const getRefreshTokenExpiry = () => {
+  const days = parseInt(process.env.JWT_REFRESH_EXPIRES_IN_DAYS || "7");
+  return new Date(Date.now() + days * 24 * 60 * 60 * 1000);
+};
+
+function generateAccessToken(userId: string, tenantId: string, role: Role) {
+  const secret = process.env.JWT_ACCESS_SECRET;
+  const expiresIn = process.env.JWT_ACCESS_EXPIRES_IN_MINUTES;
+
+  if (!secret || !expiresIn) throw new Error("JWT env variables are missing");
+
+  const accessToken = jwt.sign({ userId, tenantId, role }, secret, {
+    expiresIn: expiresIn as NonNullable<SignOptions["expiresIn"]>,
+  });
+  return accessToken;
+}
+
+function generateRefreshToken(userId: string, tenantId: string, role: Role) {
+  const secret = process.env.JWT_REFRESH_SECRET;
+  const expiresIn = process.env.JWT_REFRESH_EXPIRES_IN;
+
+  if (!secret || !expiresIn) throw new Error("JWT env variables are missing");
+
+  const refreshToken = jwt.sign({ userId, tenantId, role }, secret, {
+    expiresIn: expiresIn as NonNullable<SignOptions["expiresIn"]>,
+  });
+  return refreshToken;
+}
+
+export { signupService, loginService, refreshTokenService, logoutService };
