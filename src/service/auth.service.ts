@@ -1,9 +1,8 @@
-import { Request, Response } from "express";
 import { prisma } from "../lib/prisma";
 import bcrypt from "bcrypt";
 import jwt, { SignOptions } from "jsonwebtoken";
-import { Role, User, Tenant, RefreshToken } from "@prisma/client";
-import { create } from "node:domain";
+import { Role } from "@prisma/client";
+import envVarsVerifier from "../utils/envVarsVerfier";
 
 type SignupResult = { accessToken: string; refreshToken: string };
 const signupService = async (
@@ -12,6 +11,8 @@ const signupService = async (
   email: string,
   password: string,
 ): Promise<SignupResult> => {
+  envVarsVerifier();
+
   const checkExistingSlug = await prisma.tenant.findUnique({
     where: { slug },
   });
@@ -43,6 +44,7 @@ const signupService = async (
 };
 
 const loginService = async (email: string, password: string, slug: string) => {
+  envVarsVerifier();
   const tenant = await prisma.tenant.findUnique({ where: { slug } });
   if (!tenant) throw new Error("Invalid Credentials");
 
@@ -62,12 +64,13 @@ const loginService = async (email: string, password: string, slug: string) => {
 };
 
 const refreshTokenService = async (refreshToken: string) => {
+  envVarsVerifier();
   let payload;
-  try{
+  try {
     payload = jwt.verify(
-    refreshToken,
-    process.env.JWT_REFRESH_SECRET || "",
-  ) as { userId: string; tenantId: string, role: Role };
+      refreshToken,
+      process.env.JWT_REFRESH_SECRET as string,
+    ) as { userId: string; tenantId: string; role: Role };
   } catch (error) {
     throw new Error("Invalid refresh token");
   }
@@ -87,19 +90,15 @@ const refreshTokenService = async (refreshToken: string) => {
   const newRefreshToken = generateRefreshToken(
     payload.userId,
     payload.tenantId,
-    payload.role
+    payload.role,
   );
 
-  await createRefreshToken(
-    newRefreshToken,
-    payload.userId,
-    payload.tenantId,
-  );
+  await createRefreshToken(newRefreshToken, payload.userId, payload.tenantId);
 
   const accessToken = generateAccessToken(
     payload.userId,
     payload.tenantId,
-    payload.role
+    payload.role,
   );
 
   return { newRefreshToken, accessToken };
@@ -111,6 +110,25 @@ const logoutService = async (refreshToken: string) => {
 
   return true;
 };
+
+function generateAccessToken(userId: string, tenantId: string, role: Role) {
+  const secret = process.env.JWT_ACCESS_SECRET || "";
+  const expiresIn = process.env.JWT_ACCESS_EXPIRES_IN_MINUTES;
+
+  const accessToken = jwt.sign({ userId, tenantId, role }, secret, {
+    expiresIn: expiresIn as NonNullable<SignOptions["expiresIn"]>,
+  });
+  return accessToken;
+}
+
+function generateRefreshToken(userId: string, tenantId: string, role: Role) {
+  const secret = process.env.JWT_REFRESH_SECRET as string;
+  const days = parseInt(process.env.JWT_REFRESH_EXPIRES_IN_DAYS || "7");
+
+  return jwt.sign({ userId, tenantId, role }, secret, {
+    expiresIn: days * 24 * 60 * 60, // days → seconds
+  });
+}
 
 const createRefreshToken = async (
   token: string,
@@ -127,29 +145,5 @@ const getRefreshTokenExpiry = () => {
   const days = parseInt(process.env.JWT_REFRESH_EXPIRES_IN_DAYS || "7");
   return new Date(Date.now() + days * 24 * 60 * 60 * 1000);
 };
-
-function generateAccessToken(userId: string, tenantId: string, role: Role) {
-  const secret = process.env.JWT_ACCESS_SECRET;
-  const expiresIn = process.env.JWT_ACCESS_EXPIRES_IN_MINUTES;
-
-  if (!secret || !expiresIn) throw new Error("JWT env variables are missing");
-
-  const accessToken = jwt.sign({ userId, tenantId, role }, secret, {
-    expiresIn: expiresIn as NonNullable<SignOptions["expiresIn"]>,
-  });
-  return accessToken;
-}
-
-function generateRefreshToken(userId: string, tenantId: string, role: Role) {
-  const secret = process.env.JWT_REFRESH_SECRET;
-  const expiresIn = process.env.JWT_REFRESH_EXPIRES_IN;
-
-  if (!secret || !expiresIn) throw new Error("JWT env variables are missing");
-
-  const refreshToken = jwt.sign({ userId, tenantId, role }, secret, {
-    expiresIn: expiresIn as NonNullable<SignOptions["expiresIn"]>,
-  });
-  return refreshToken;
-}
 
 export { signupService, loginService, refreshTokenService, logoutService };

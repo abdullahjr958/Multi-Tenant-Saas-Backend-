@@ -39,9 +39,12 @@ const signupController = async (req: Request, res: Response) => {
 
 const loginController = async (req: Request, res: Response) => {
   try {
+    console.log("FROM LOGIN CONTROLLER: ");
     const result = loginSchema.safeParse(req.body);
-    if (!result.success)
+    if (!result.success){
+      console.log("VALIDATION ERROR:", z.flattenError(result.error));
       return res.status(400).send({ errors: z.flattenError(result.error) });
+    }
 
     const { email, password, slug } = result.data;
     const { accessToken, refreshToken } = await loginService(
@@ -66,6 +69,7 @@ const loginController = async (req: Request, res: Response) => {
 const refreshTokenController = async (req: Request, res: Response) => {
   try {
     let { refreshToken } = req.cookies;
+    console.log("FROM REFRESH TOKEN CONTROLLER, refreshToken:", refreshToken);
     if (!refreshToken)
       return res.status(400).json({ message: "No refresh token provided" });
     const { newRefreshToken, accessToken } = await refreshTokenService(refreshToken);
