@@ -3,6 +3,7 @@ import bcrypt from "bcrypt";
 import jwt, { SignOptions } from "jsonwebtoken";
 import { Role } from "@prisma/client";
 import envVarsVerifier from "../utils/envVarsVerfier";
+import { createAuditLog } from "./audit.service";
 
 type SignupResult = { accessToken: string; refreshToken: string };
 const signupService = async (
@@ -60,6 +61,7 @@ const loginService = async (email: string, password: string, slug: string) => {
   const refreshToken = generateRefreshToken(user.id, tenant.id, user.role);
 
   await createRefreshToken(refreshToken, user.id, tenant.id);
+  createAuditLog("USER_LOGIN", "User", user.id, user.id, tenant.id).catch(err => console.error(`Failed to create audit log: ${err.message}`));
   return { accessToken, refreshToken };
 };
 

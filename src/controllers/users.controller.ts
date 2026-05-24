@@ -35,14 +35,14 @@ const getUserByIdController = async (req: Request, res: Response) => {
 
 const updateUserRoleController = async (req: Request, res: Response) => {
   try {
-    const { tenantId } = req.user!;
+    const { userId, tenantId } = req.user!;
     const { role } = req.body;
     const { id } = req.params;
 
     if(!role) throw new Error("Role not found");
     if(!id || typeof id !== "string") throw new Error("id params not found");
 
-    const updatedUser = await updateUserRole(id, tenantId, role);
+    const updatedUser = await updateUserRole(id, userId, tenantId, role);
     return res.status(200).json(updatedUser);
   } catch (error) {
     if (error instanceof Error)
@@ -53,11 +53,11 @@ const updateUserRoleController = async (req: Request, res: Response) => {
 
 const deleteUserController = async (req: Request, res: Response) => {
   try {
-    const { tenantId } = req.user!;
+    const { userId, tenantId } = req.user!;
     const { id } = req.params;
     if(!id || typeof id !== "string") throw new Error("id params not found");
 
-    await deleteUser(id, tenantId);
+    await deleteUser(id, userId, tenantId);
     return res.status(200).json({ message: "User deleted successfully" });
   } catch (error) {
     if (error instanceof Error)

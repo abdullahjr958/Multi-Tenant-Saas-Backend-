@@ -1,6 +1,7 @@
 import { prisma } from "../lib/prisma";
 import { Prisma } from "@prisma/client";
 import { Role } from "@prisma/client";
+import { createAuditLog } from "./audit.service";
 
 const getUsers = async (tenantId: string) => {
   const users = await prisma.user.findMany({
@@ -19,13 +20,15 @@ const getUserById = async (id: string, tenantId: string) => {
   return user;
 };
 
-const updateUserRole = async (id: string, tenantId: string, role: Role) => {
+const updateUserRole = async (id: string, userId: string, tenantId: string, role: Role) => {
   try {
     const updatedUser = await prisma.user.update({
       where: { id, tenantId },
       data: { role },
       select: { id: true, email: true, role: true },
     });
+
+    createAuditLog("USER_ROLE_UPDATE", "User", id, userId, tenantId, { newRole: role }).catch(err => console.error(`Failed to create audit log: ${err.message}`));
     return updatedUser;
   } catch (error) {
     if (
@@ -37,11 +40,13 @@ const updateUserRole = async (id: string, tenantId: string, role: Role) => {
   }
 };
 
-const deleteUser = async (id: string, tenantId: string) => {
+const deleteUser = async (id: string, userId: string, tenantId: string) => {
   try {
     await prisma.user.delete({
       where: { id, tenantId },
     });
+
+    createAuditLog("USER_DELETED", "User", id, userId, tenantId).catch(err => console.error(`Failed to create audit log: ${err.message}`));
     return true;
   } catch (error) {
     if (
