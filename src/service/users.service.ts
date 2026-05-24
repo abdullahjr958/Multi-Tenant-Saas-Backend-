@@ -2,13 +2,38 @@ import { prisma } from "../lib/prisma";
 import { Prisma } from "@prisma/client";
 import { Role } from "@prisma/client";
 import { createAuditLog } from "./audit.service";
+import { GetUsersQuery } from "../validators/users.validator";
 
-const getUsers = async (tenantId: string) => {
-  const users = await prisma.user.findMany({
-    where: { tenantId },
-    select: { id: true, email: true, role: true },
-  });
-  return users;
+const getUsers = async (tenantId: string, query: GetUsersQuery) => {
+  const { page, limit, role, email } = query;
+  const skip = (page - 1) * limit;
+
+  const where: Prisma.UserWhereInput = {
+    tenantId,
+    ...(role && { role }),
+    ...(email && { email: { contains: email, mode: "insensitive" } }),
+  };
+
+  const [users, total] = await prisma.$transaction([
+    prisma.user.findMany({
+      where,
+      select: { id: true, email: true, role: true },
+      skip,
+      take: limit,
+      orderBy: { createdAt: "desc" },
+    }),
+    prisma.user.count({ where }),
+  ])
+
+  return {
+    data: users,
+    meta: {
+      total,
+      page,
+      limit,
+      totalPages: Math.ceil(total / limit)
+    }
+  };
 };
 
 const getUserById = async (id: string, tenantId: string) => {

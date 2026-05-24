@@ -5,12 +5,13 @@ import {
   updateUserRole,
   deleteUser,
 } from "../service/users.service";
+import { GetUsersQuery } from "../validators/users.validator";
 
 const getUsersController = async (req: Request, res: Response) => {
   try {
     const { tenantId } = req.user!;
-    const users = await getUsers(tenantId);
-    return res.status(200).json(users);
+    const { data, meta } = await getUsers(tenantId, req.query as unknown as GetUsersQuery);
+    return res.status(200).json({ data, meta });
   } catch (error) {
     if (error instanceof Error)
       return res.status(400).json({ error: error.message });
