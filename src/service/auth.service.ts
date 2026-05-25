@@ -42,6 +42,7 @@ const signupService = async (
   const refreshToken = generateRefreshToken(user.id, tenant.id, user.role);
 
   await createRefreshToken(refreshToken, user.id, tenant.id);
+  createAuditLog("USER_SIGNUP", "User", user.id, user.id, tenant.id).catch(err => console.error(`Failed to create audit log: ${err.message}`));
   return { accessToken, refreshToken };
 };
 
@@ -108,14 +109,12 @@ const refreshTokenService = async (refreshToken: string) => {
 };
 
 const logoutService = async (refreshToken: string) => {
-  if (!refreshToken) throw new AppError("Refresh token is required for logout", 401);
   await prisma.refreshToken.delete({ where: { token: refreshToken } });
-
   return true;
 };
 
 function generateAccessToken(userId: string, tenantId: string, role: Role) {
-  const secret = process.env.JWT_ACCESS_SECRET || "";
+  const secret = process.env.JWT_ACCESS_SECRET as string;
   const expiresIn = process.env.JWT_ACCESS_EXPIRES_IN_MINUTES;
 
   const accessToken = jwt.sign({ userId, tenantId, role }, secret, {

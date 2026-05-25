@@ -10,11 +10,7 @@ import { z } from "zod";
 
 const signupController = async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const result = signupSchema.safeParse(req.body);
-    if (!result.success)
-      return res.status(400).send({ errors: z.flattenError(result.error) });
-
-    const { name, slug, email, password } = result.data;
+    const { name, slug, email, password } = req.body;
 
     const { accessToken, refreshToken } = await signupService(
       name,
@@ -38,10 +34,8 @@ const signupController = async (req: Request, res: Response, next: NextFunction)
 
 const loginController = async (req: Request, res: Response, next: NextFunction) => {
   try {
-    console.log("FROM LOGIN CONTROLLER: ");
     const result = loginSchema.safeParse(req.body);
     if (!result.success){
-      console.log("VALIDATION ERROR:", z.flattenError(result.error));
       return res.status(400).send({ errors: z.flattenError(result.error) });
     }
 
@@ -67,7 +61,6 @@ const loginController = async (req: Request, res: Response, next: NextFunction) 
 const refreshTokenController = async (req: Request, res: Response, next: NextFunction) => {
   try {
     let { refreshToken } = req.cookies;
-    console.log("FROM REFRESH TOKEN CONTROLLER, refreshToken:", refreshToken);
     if (!refreshToken)
       return res.status(400).json({ message: "No refresh token provided" });
     const { newRefreshToken, accessToken } = await refreshTokenService(refreshToken);
