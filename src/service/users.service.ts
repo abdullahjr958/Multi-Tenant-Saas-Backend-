@@ -3,6 +3,7 @@ import { Prisma } from "@prisma/client";
 import { Role } from "@prisma/client";
 import { createAuditLog } from "./audit.service";
 import { GetUsersQuery } from "../validators/users.validator";
+import AppError from "../lib/AppError";
 
 const getUsers = async (tenantId: string, query: GetUsersQuery) => {
   const { page, limit, role, email } = query;
@@ -41,7 +42,7 @@ const getUserById = async (id: string, tenantId: string) => {
     where: { id, tenantId },
     select: { id: true, email: true, role: true },
   });
-  if (!user) throw new Error("User not found");
+  if (!user) throw new AppError("User not found", 404);
   return user;
 };
 
@@ -60,7 +61,7 @@ const updateUserRole = async (id: string, userId: string, tenantId: string, role
       error instanceof Prisma.PrismaClientKnownRequestError &&
       error.code === "P2025"
     )
-      throw new Error("User not found");
+      throw new AppError("User not found", 404);
     throw error;
   }
 };
@@ -78,7 +79,7 @@ const deleteUser = async (id: string, userId: string, tenantId: string) => {
       error instanceof Prisma.PrismaClientKnownRequestError &&
       error.code === "P2025"
     )
-      throw new Error("User not found");
+      throw new AppError("User not found", 404);
     throw error;
   }
 };

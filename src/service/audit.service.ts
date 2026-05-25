@@ -1,3 +1,4 @@
+import AppError from "../lib/AppError";
 import { prisma } from "../lib/prisma";
 
 const createAuditLog = async (
@@ -9,7 +10,7 @@ const createAuditLog = async (
   metadata?: object,
 ) => {
   if (!action || !entity || !entityId || !userId || !tenantId)
-    throw new Error("Missing required fields for audit log");
+    throw new AppError("Missing required fields for audit log", 401);
 
   const auditlog = await prisma.auditLog.create({
     data: {

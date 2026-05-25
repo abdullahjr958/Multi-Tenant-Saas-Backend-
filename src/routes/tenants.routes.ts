@@ -18,3 +18,5 @@ router.patch(
   reqBodyValidator(updateTenantSchema),
   updateTenantController,
 );
+
+export default router;

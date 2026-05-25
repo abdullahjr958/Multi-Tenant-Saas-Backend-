@@ -1,4 +1,4 @@
-import { Request, Response } from "express";
+import { Request, Response, NextFunction } from "express";
 import {
   signupService,
   loginService,
@@ -8,7 +8,7 @@ import {
 import { signupSchema, loginSchema } from "../validators/auth.validator";
 import { z } from "zod";
 
-const signupController = async (req: Request, res: Response) => {
+const signupController = async (req: Request, res: Response, next: NextFunction) => {
   try {
     const result = signupSchema.safeParse(req.body);
     if (!result.success)
@@ -32,12 +32,11 @@ const signupController = async (req: Request, res: Response) => {
       })
       .send({ accessToken });
   } catch (error) {
-    if (error instanceof Error) res.status(400).send({ error: error.message });
-    else res.status(500).send({ error: "Internal Server Error" });
+    next(error);
   }
 };
 
-const loginController = async (req: Request, res: Response) => {
+const loginController = async (req: Request, res: Response, next: NextFunction) => {
   try {
     console.log("FROM LOGIN CONTROLLER: ");
     const result = loginSchema.safeParse(req.body);
@@ -61,12 +60,11 @@ const loginController = async (req: Request, res: Response) => {
       })
       .send({ accessToken });
   } catch (error) {
-    if (error instanceof Error) res.status(400).send({ error: error.message });
-    else res.status(500).send({ error: "Internal Server Error" });
+    next(error);
   }
 };
 
-const refreshTokenController = async (req: Request, res: Response) => {
+const refreshTokenController = async (req: Request, res: Response, next: NextFunction) => {
   try {
     let { refreshToken } = req.cookies;
     console.log("FROM REFRESH TOKEN CONTROLLER, refreshToken:", refreshToken);
@@ -82,12 +80,11 @@ const refreshTokenController = async (req: Request, res: Response) => {
       })
       .json({ accessToken });
   } catch (error) {
-    if (error instanceof Error) res.status(400).send({ error: error.message });
-    else res.status(500).send({ error: "Internal Server Error" });
+    next(error);
   }
 };
 
-const logoutController = async (req: Request, res: Response) => {
+const logoutController = async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { refreshToken } = req.cookies;
     if (!refreshToken) return res.status(400).json({ message: "No refresh token provided" });
@@ -98,8 +95,7 @@ const logoutController = async (req: Request, res: Response) => {
       .clearCookie("refreshToken")
       .send({ message: "Logged out successfully" });
   } catch (error) {
-    if (error instanceof Error) res.status(400).send({ error: error.message });
-    else res.status(500).send({ error: "Internal Server Error" });
+    next(error);
   }
 };
 

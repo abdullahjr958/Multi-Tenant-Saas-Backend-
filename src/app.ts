@@ -1,9 +1,33 @@
 import express from 'express'
-import authRoutes from './routes/auth.routes'
 import cookieParser from 'cookie-parser'
+import helmet from 'helmet'
+import rateLimit from 'express-rate-limit'
 import logger from './middleware/logger.middleware'
+import authRoutes from './routes/auth.routes'
+import userRoutes from './routes/users.routes'
+import tenantRoutes from './routes/tenants.routes'
+import errorHandler from './middleware/error.middleware'
 
 const app = express()
+
+app.use(helmet())
+app.use(rateLimit({
+    windowMs: 15 * 60 * 1000,
+    max: 100,
+    message: "Too many requests, please try again later"
+}))
+
+app.use(express.json())
+app.use(cookieParser())
+app.use(logger)
+
+app.use('/auth', authRoutes)
+app.use('/users', userRoutes)
+app.use('/tenants', tenantRoutes)
+
+app.use(errorHandler)
+
+export default app;
 
 // app.use((req, res, next) => {
 //   let data = '';
@@ -16,11 +40,3 @@ const app = express()
 
 // console.log(typeof process.env.DATABASE_URL)
 // console.log(process.env.DATABASE_URL)
-app.use(express.json())
-app.use(cookieParser())
-app.use(logger)
-
-console.log("FROM app.ts before auth routes: ");
-app.use('/auth', authRoutes)
-
-export default app;

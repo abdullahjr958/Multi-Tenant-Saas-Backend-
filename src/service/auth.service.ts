@@ -4,6 +4,7 @@ import jwt, { SignOptions } from "jsonwebtoken";
 import { Role } from "@prisma/client";
 import envVarsVerifier from "../utils/envVarsVerfier";
 import { createAuditLog } from "./audit.service";
+import AppError from "../lib/AppError";
 
 type SignupResult = { accessToken: string; refreshToken: string };
 const signupService = async (
@@ -17,7 +18,7 @@ const signupService = async (
   const checkExistingSlug = await prisma.tenant.findUnique({
     where: { slug },
   });
-  if (checkExistingSlug) throw new Error("Slug already exists");
+  if (checkExistingSlug) throw new AppError("Slug already exists", 409);
 
   const hashedPassword = await bcrypt.hash(password, 10);
 
@@ -47,7 +48,7 @@ const signupService = async (
 const loginService = async (email: string, password: string, slug: string) => {
   envVarsVerifier();
   const tenant = await prisma.tenant.findUnique({ where: { slug } });
-  if (!tenant) throw new Error("Invalid Credentials");
+  if (!tenant) throw new AppError("Invalid Credentials", 401);
 
   const user = await prisma.user.findUnique({
     where: { email_tenantId: { email, tenantId: tenant.id } },
@@ -55,7 +56,7 @@ const loginService = async (email: string, password: string, slug: string) => {
 
   const isPasswordValid =
     user && (await bcrypt.compare(password, user.password));
-  if (!user || !isPasswordValid) throw new Error("Invalid Credentials");
+  if (!user || !isPasswordValid) throw new AppError("Invalid Credentials", 401);
 
   const accessToken = generateAccessToken(user.id, tenant.id, user.role);
   const refreshToken = generateRefreshToken(user.id, tenant.id, user.role);
@@ -74,17 +75,17 @@ const refreshTokenService = async (refreshToken: string) => {
       process.env.JWT_REFRESH_SECRET as string,
     ) as { userId: string; tenantId: string; role: Role };
   } catch (error) {
-    throw new Error("Invalid refresh token");
+    throw new AppError("Invalid refresh token", 401);
   }
 
   const refreshTokenRecord = await prisma.refreshToken.findUnique({
     where: { token: refreshToken },
   });
   // If token not found or expired, throw error
-  if (!refreshTokenRecord) throw new Error("Refresh token not found");
+  if (!refreshTokenRecord) throw new AppError("Refresh token not found", 401);
   if (refreshTokenRecord.expiresAt < new Date()) {
     await prisma.refreshToken.delete({ where: { token: refreshToken } });
-    throw new Error("Refresh token expired");
+    throw new AppError("Refresh token expired", 401);
   }
 
   // Delete old token and create and return new one
@@ -107,7 +108,7 @@ const refreshTokenService = async (refreshToken: string) => {
 };
 
 const logoutService = async (refreshToken: string) => {
-  if (!refreshToken) throw new Error("Refresh token is required for logout");
+  if (!refreshToken) throw new AppError("Refresh token is required for logout", 401);
   await prisma.refreshToken.delete({ where: { token: refreshToken } });
 
   return true;

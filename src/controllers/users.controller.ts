@@ -1,4 +1,4 @@
-import { Request, Response } from "express";
+import { Request, Response, NextFunction } from "express";
 import {
   getUsers,
   getUserById,
@@ -7,19 +7,17 @@ import {
 } from "../service/users.service";
 import { GetUsersQuery } from "../validators/users.validator";
 
-const getUsersController = async (req: Request, res: Response) => {
+const getUsersController = async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { tenantId } = req.user!;
     const { data, meta } = await getUsers(tenantId, req.query as unknown as GetUsersQuery);
     return res.status(200).json({ data, meta });
   } catch (error) {
-    if (error instanceof Error)
-      return res.status(400).json({ error: error.message });
-    return res.status(500).json({ error: "Internal server error" });
+    next(error);
   }
 };
 
-const getUserByIdController = async (req: Request, res: Response) => {
+const getUserByIdController = async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { userId, tenantId } = req.user!;
     const { id } = req.params;
@@ -28,13 +26,12 @@ const getUserByIdController = async (req: Request, res: Response) => {
     const user = await getUserById(id, tenantId);
     return res.status(200).json(user);
   } catch (error) {
-    if (error instanceof Error)
-      return res.status(400).json({ error: error.message });
+    next(error);
     return res.status(500).json({ error: "Internal server error" });
   }
 };
 
-const updateUserRoleController = async (req: Request, res: Response) => {
+const updateUserRoleController = async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { userId, tenantId } = req.user!;
     const { role } = req.body;
@@ -46,13 +43,11 @@ const updateUserRoleController = async (req: Request, res: Response) => {
     const updatedUser = await updateUserRole(id, userId, tenantId, role);
     return res.status(200).json(updatedUser);
   } catch (error) {
-    if (error instanceof Error)
-      return res.status(400).json({ error: error.message });
-    return res.status(500).json({ error: "Internal server error" });
+    next(error);
   }
 };
 
-const deleteUserController = async (req: Request, res: Response) => {
+const deleteUserController = async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { userId, tenantId } = req.user!;
     const { id } = req.params;
@@ -61,8 +56,7 @@ const deleteUserController = async (req: Request, res: Response) => {
     await deleteUser(id, userId, tenantId);
     return res.status(200).json({ message: "User deleted successfully" });
   } catch (error) {
-    if (error instanceof Error)
-      return res.status(400).json({ error: error.message });
+    next(error);
     return res.status(500).json({ error: "Internal server error" });
   }
 };

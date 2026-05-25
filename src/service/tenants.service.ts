@@ -1,3 +1,4 @@
+import AppError from "../lib/AppError";
 import { prisma } from "../lib/prisma";
 import { Prisma } from "@prisma/client";
 
@@ -6,7 +7,7 @@ const getTenantByIdService = async (tenantId: string) => {
     where: { id: tenantId },
     select: { id: true, name: true, slug: true, createdAt: true },
   });
-  if (!tenant) throw new Error("Tenant not found");
+  if (!tenant) throw new AppError("Tenant not found", 404);
   return tenant;
 };
 
@@ -28,7 +29,7 @@ const updateTenantService = async (
       error instanceof Prisma.PrismaClientKnownRequestError &&
       error.code === "P2025"
     )
-      throw new Error("Tenant not found");
+      throw new AppError("Tenant not found", 404);
     throw error;
   }
 };
