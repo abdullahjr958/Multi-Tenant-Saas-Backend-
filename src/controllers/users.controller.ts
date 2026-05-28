@@ -10,7 +10,7 @@ import { GetUsersQuery } from "../validators/users.validator";
 const getUsersController = async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { tenantId } = req.user!;
-    const { data, meta } = await getUsers(tenantId, req.query as unknown as GetUsersQuery);
+    const { data, meta } = await getUsers(tenantId, req.parsedQuery as GetUsersQuery);
     return res.status(200).json({ data, meta });
   } catch (error) {
     next(error);

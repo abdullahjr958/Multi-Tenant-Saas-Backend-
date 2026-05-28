@@ -7,6 +7,7 @@ declare global {
         tenantId: string;
         role: import ("@prisma/client").Role;
       };
+      parsedQuery?: Record<string, any>;
     }
   }
 }

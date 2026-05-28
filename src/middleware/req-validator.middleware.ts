@@ -37,7 +37,7 @@ const reqQueryValidator = <T extends ZodType>(schema: T) => (req: Request, res: 
     })
   }
 
-  req.query = parsed.data as any;
+  (req as any).parsedQuery = parsed.data;
   next();
 }
 
